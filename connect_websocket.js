@@ -1,32 +1,21 @@
-require('dotenv').config(); // Load environment variables from .env file
+require('dotenv').config();
 
-let cachedAccessToken = null; // Cache for the access_token
-let tokenExpiryTime = 0; // Expiry time for the access_token (timestamp)
+let accessToken = null;
+let heartbeatInterval = null;
 
 function connectWebSocket() {
     const subscriptionId = process.env.SUBSCRIPTION_ID;
     const primaryWsUrl = `wss://ws.zoom.us/ws?subscriptionId=${subscriptionId}`;
-    const backupWsUrl = `wss://backupws.us/ws?subscriptionId=${subscriptionId}`;
     let currentWsUrl = primaryWsUrl;
     let socket;
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 10; // Maximum number of reconnection attempts
-    const reconnectInterval = 3000; // Interval between reconnection attempts (in milliseconds)
 
+    // Fetch access token from Zoom
     async function getAccessToken() {
-        // Check if the cached token is still valid
-        if (cachedAccessToken && Date.now() < tokenExpiryTime) {
-            console.log("Using cached access token.");
-            return cachedAccessToken;
-        }
-
-        const accountId = process.env.ACCOUNT_ID;
         const username = process.env.CLIENT_USERNAME;
         const password = process.env.CLIENT_PASSWORD;
-
-        const url = `https://zoom.us/oauth/token?grant_type=client_credentials&account_id=${accountId}`;
+        const url = `https://zoom.us/oauth/token?grant_type=client_credentials`;
         const headers = {
-            "Authorization": `Basic ${btoa(`${username}:${password}`)}`, // Base64 encoding
+            "Authorization": `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`,
             "Content-Type": "application/x-www-form-urlencoded"
         };
 
@@ -36,79 +25,69 @@ function connectWebSocket() {
                 headers: headers,
             });
 
+            const data = await response.json();
             if (!response.ok) {
-                throw new Error(`Failed to fetch access token: ${response.statusText}`);
+                throw new Error(`Failed to fetch access token: ${JSON.stringify(data)}`);
             }
 
-            const data = await response.json();
-            cachedAccessToken = data.access_token;
-            tokenExpiryTime = Date.now() + (data.expires_in * 1000) - 60000;
-            console.log(`Fetched new access token. Expires in ${data.expires_in} seconds.`);
-            return cachedAccessToken;
+            accessToken = data.access_token;
+            console.log(`Fetched new access token.`);
+            return accessToken;
         } catch (error) {
             console.error("Error fetching access token:", error);
             throw error;
         }
     }
 
+    // Create WebSocket connection
     async function createWebSocket() {
         try {
+            // Fetch access token before connecting
             const accessToken = await getAccessToken();
             console.log(`Attempting to connect to WebSocket: ${currentWsUrl}`);
             socket = new WebSocket(`${currentWsUrl}&access_token=${accessToken}`);
 
             socket.addEventListener('open', () => {
                 console.log('WebSocket connection opened.');
-                reconnectAttempts = 0; // Reset reconnection attempts on successful connection
+                startHeartbeat();
             });
 
             socket.addEventListener('message', (event) => {
                 console.log('Message received from WebSocket:', event.data);
             });
 
-            socket.addEventListener('close', async (event) => {
+            socket.addEventListener('close', (event) => {
                 console.warn('WebSocket connection closed:', event.reason);
-
-                // Try reconnecting
-                if (event.reason === "invalid_token") {
-                    console.log("Invalid token detected. Fetching a new token...");
-                    cachedAccessToken = null;
-                    await getAccessToken();
-                    await createWebSocket();
-                } else {
-                    await attemptReconnect();
-                }
+                stopHeartbeat();
             });
 
             socket.addEventListener('error', (error) => {
                 console.error('WebSocket error:', error);
-                socket.close();
+                stopHeartbeat();
             });
         } catch (error) {
             console.error("Error creating WebSocket:", error);
-            await attemptReconnect();
         }
     }
 
-    async function attemptReconnect() {
-        reconnectAttempts++;
-        if (reconnectAttempts <= maxReconnectAttempts) {
-            console.log(`Reconnecting WebSocket... (${reconnectAttempts}/${maxReconnectAttempts})`);
-            setTimeout(createWebSocket, reconnectInterval); // Retry after a delay
-        } else {
-            console.warn('Maximum reconnect attempts reached. Switching to backup WebSocket URL.');
-            switchToBackupUrl();
-        }
+    function startHeartbeat() {
+        const heartbeatMessage = JSON.stringify({ module: 'heartbeat' });
+        // Heartbeat interval, 30 seconds
+        const heartbeatIntervalMs = 30000;
+
+        heartbeatInterval = setInterval(() => {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(heartbeatMessage);
+                console.log('Heartbeat sent.');
+            }
+        }, heartbeatIntervalMs);
     }
 
-    function switchToBackupUrl() {
-        if (currentWsUrl === primaryWsUrl) {
-            currentWsUrl = backupWsUrl;
-            console.log('Switched to backup WebSocket URL.');
-            reconnectAttempts = 0; // Reset reconnection attempts when switching to backup URL
-            createWebSocket();
-        } else {
-            console.error('Both primary and backup WebSocket URLs failed. Giving up.');
+    function stopHeartbeat() {
+        if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+            heartbeatInterval = null;
+            console.log('Heartbeat stopped.');
         }
     }
 
