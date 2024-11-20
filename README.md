@@ -1,76 +1,117 @@
 
-# WebSocket Demo
+# WebSocket Demo with Zoom Integration
 
-This project is a simple demonstration of WebSocket implementation using Node.js and JavaScript. It showcases how to establish a WebSocket connection, handle messages, and manage connection events.
+This repository demonstrates how to integrate with Zoom's WebSocket API, including OAuth token fetching and WebSocket connection management. It includes a heartbeat mechanism to keep WebSocket connections alive and provides a reference implementation for interacting with Zoom's WebSocket-based services.
+
+## Repository
+
+- **Repo URL**: [https://github.com/eziosudo/websocket_demo](https://github.com/eziosudo/websocket_demo)
+
+## Features
+
+- Fetches Zoom OAuth access tokens using the client credentials grant type.
+- Establishes a WebSocket connection with Zoom servers.
+- Implements a heartbeat mechanism to maintain the WebSocket connection.
+- Handles WebSocket events, including `open`, `message`, `close`, and `error`.
 
 ## Prerequisites
 
-Ensure you have the following installed on your system:
+Before running the project, ensure you have the following:
 
-- [Node.js](https://nodejs.org/) (version 14 or higher)
-- [npm](https://www.npmjs.com/) (Node.js package manager)
+1. **Node.js**: Version 18.0.0 or higher (or use `node-fetch` for lower versions).
+2. **Zoom Account**: Create an server-to-server OAuth or general app on the [Zoom Marketplace](https://marketplace.zoom.us/) to get your client ID and client secret.
+3. **Environment Variables**: Set up a `.env` file for your credentials.
 
 ## Installation
 
-1. **Clone the repository**:
-
+1. Clone the repository:
    ```bash
    git clone https://github.com/eziosudo/websocket_demo.git
-   ```
-
-2. **Navigate to the project directory**:
-
-   ```bash
    cd websocket_demo
    ```
 
-3. **Install dependencies**:
-
+2. Install dependencies:
    ```bash
    npm install
    ```
 
-## Usage
+3. Create a `.env` file with the following keys:
+   ```plaintext
+   CLIENT_USERNAME=your_client_id
+   CLIENT_PASSWORD=your_client_secret
+   SUBSCRIPTION_ID=your_subscription_id
+   ```
 
-1. **Start the WebSocket server**:
-
+4. Run the application:
    ```bash
    node connect_websocket.js
    ```
 
-   The server will start and listen for WebSocket connections.
+## File Structure
 
-2. **Connect to the WebSocket server**:
+- **`connect_websocket.js`**: Core implementation file.
+  - Fetches OAuth tokens from Zoom.
+  - Establishes a WebSocket connection.
+  - Sends periodic heartbeat messages.
+  - Handles WebSocket events such as `open`, `message`, `close`, and `error`.
 
-   Use a WebSocket client to connect to the server. For example, you can use the following JavaScript code in a browser console:
+## How It Works
 
-   ```javascript
-   const socket = new WebSocket('ws://localhost:8080');
+### Access Token Fetching
 
-   socket.onopen = function(event) {
-     console.log('Connected to WebSocket server.');
-     socket.send('Hello Server!');
-   };
+Access tokens are fetched from Zoom's API using the client credentials grant type:
 
-   socket.onmessage = function(event) {
-     console.log('Message from server:', event.data);
-   };
+```javascript
+const url = `https://zoom.us/oauth/token?grant_type=client_credentials`;
+const headers = {
+    "Authorization": `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`,
+    "Content-Type": "application/x-www-form-urlencoded"
+};
+const response = await fetch(url, { method: "POST", headers });
+```
 
-   socket.onclose = function(event) {
-     console.log('Disconnected from WebSocket server.');
-   };
+### WebSocket Heartbeat
 
-   socket.onerror = function(error) {
-     console.error('WebSocket error:', error);
-   };
-   ```
+A heartbeat mechanism ensures the connection remains active. Heartbeat messages are sent every 30 seconds:
 
-## Features
+```javascript
+function startHeartbeat() {
+    const heartbeatMessage = JSON.stringify({ module: 'heartbeat' });
+    const heartbeatIntervalMs = 30000;
 
-- Establishes a WebSocket server using Node.js.
-- Handles client connections and messages.
-- Demonstrates basic WebSocket events: `open`, `message`, `close`, and `error`.
+    heartbeatInterval = setInterval(() => {
+        if (socket.readyState === WebSocket.OPEN) {
+            socket.send(heartbeatMessage);
+            console.log('Heartbeat sent.');
+        }
+    }, heartbeatIntervalMs);
+}
+```
 
-## License
+### WebSocket Event Handling
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+The application listens for key WebSocket events:
+
+- **`open`**: Starts the heartbeat mechanism.
+- **`message`**: Logs incoming messages.
+- **`close`**: Stops the heartbeat mechanism and logs closure.
+- **`error`**: Logs errors and stops the heartbeat mechanism.
+
+## Example
+
+Start the application to connect to Zoom's WebSocket server. Messages and events are logged to the console.
+
+```bash
+node connect_websocket.js
+```
+
+## Notes
+
+- Ensure your Zoom server-to-server OAuth or general app is properly configured in the Zoom Marketplace.
+- For production use, consider implementing a token refresh mechanism and secure credential storage.
+
+## Resources
+
+- [Zoom OAuth Documentation](https://marketplace.zoom.us/docs/guides/auth/oauth)
+- [Zoom WebSocket API Documentation](https://developers.zoom.us/docs/api/rest/websockets/)
+- [Zoom OAuth Sample App](https://github.com/zoom/zoom-oauth-sample-app)
