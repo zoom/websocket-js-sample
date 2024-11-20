@@ -114,4 +114,3 @@ node connect_websocket.js
 
 - [Zoom OAuth Documentation](https://marketplace.zoom.us/docs/guides/auth/oauth)
 - [Zoom WebSocket API Documentation](https://developers.zoom.us/docs/api/rest/websockets/)
-- [Zoom OAuth Sample App](https://github.com/zoom/zoom-oauth-sample-app)
