@@ -1,23 +1,17 @@
-require('dotenv').config(); 
+require('dotenv').config(); // Load environment variables from .env file
 
-let cachedAccessToken = null;
-let tokenExpiryTime = 0;
-// 10-second auto-disconnect timeout (in milliseconds)
-const autoDisconnectTimeout = 10000; 
+let cachedAccessToken = null; // Cache for the access_token
+let tokenExpiryTime = 0; // Expiry time for the access_token (timestamp)
 
 function connectWebSocket() {
     const subscriptionId = process.env.SUBSCRIPTION_ID;
-    const primaryWsUrl = `wss://devwsdeliver.zoomdev.us/ws?subscriptionId=${subscriptionId}`;
-    const backupWsUrl = `wss://backupws.zoomdev.us/ws?subscriptionId=${subscriptionId}`;
+    const primaryWsUrl = `wss://ws.zoom.us/ws?subscriptionId=${subscriptionId}`;
+    const backupWsUrl = `wss://backupws.us/ws?subscriptionId=${subscriptionId}`;
     let currentWsUrl = primaryWsUrl;
     let socket;
     let reconnectAttempts = 0;
-     // Maximum number of reconnection attempts
-    const maxReconnectAttempts = 10;
-    // Interval between reconnection attempts (in milliseconds)
-    const reconnectInterval = 3000;
-     // Timer to detect inactivity
-    let inactivityTimer;
+    const maxReconnectAttempts = 10; // Maximum number of reconnection attempts
+    const reconnectInterval = 3000; // Interval between reconnection attempts (in milliseconds)
 
     async function getAccessToken() {
         // Check if the cached token is still valid
@@ -30,9 +24,9 @@ function connectWebSocket() {
         const username = process.env.CLIENT_USERNAME;
         const password = process.env.CLIENT_PASSWORD;
 
-        const url = `https://zoomdev.us/oauth/token?grant_type=client_credentials&account_id=${accountId}`;
+        const url = `https://zoom.us/oauth/token?grant_type=client_credentials&account_id=${accountId}`;
         const headers = {
-            "Authorization": `Basic ${btoa(`${username}:${password}`)}`,
+            "Authorization": `Basic ${btoa(`${username}:${password}`)}`, // Base64 encoding
             "Content-Type": "application/x-www-form-urlencoded"
         };
 
@@ -65,13 +59,11 @@ function connectWebSocket() {
 
             socket.addEventListener('open', () => {
                 console.log('WebSocket connection opened.');
-                resetInactivityTimer();
-                reconnectAttempts = 0;
+                reconnectAttempts = 0; // Reset reconnection attempts on successful connection
             });
 
             socket.addEventListener('message', (event) => {
                 console.log('Message received from WebSocket:', event.data);
-                resetInactivityTimer();
             });
 
             socket.addEventListener('close', async (event) => {
@@ -84,7 +76,6 @@ function connectWebSocket() {
                     await getAccessToken();
                     await createWebSocket();
                 } else {
-                    clearTimeout(inactivityTimer);
                     await attemptReconnect();
                 }
             });
@@ -114,19 +105,11 @@ function connectWebSocket() {
         if (currentWsUrl === primaryWsUrl) {
             currentWsUrl = backupWsUrl;
             console.log('Switched to backup WebSocket URL.');
-            reconnectAttempts = 0;
+            reconnectAttempts = 0; // Reset reconnection attempts when switching to backup URL
             createWebSocket();
         } else {
             console.error('Both primary and backup WebSocket URLs failed. Giving up.');
         }
-    }
-
-    function resetInactivityTimer() {
-        clearTimeout(inactivityTimer);
-        inactivityTimer = setTimeout(() => {
-            console.warn('WebSocket inactive for 10 seconds. Closing connection.');
-            socket.close();
-        }, autoDisconnectTimeout);
     }
 
     createWebSocket();
