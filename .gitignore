@@ -1,3 +1,4 @@
 node_modules
 .env
+.envDev
 package-lock.json
