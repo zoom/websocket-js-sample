@@ -40,6 +40,9 @@ Before running the project, ensure you have the following:
    CLIENT_USERNAME=your_client_id
    CLIENT_PASSWORD=your_client_secret
    SUBSCRIPTION_ID=your_subscription_id
+
+   OAUTH_URL=https://zoom.us/oauth/token
+   WS_URL=wss://ws.zoom.us/ws
    ```
 
 4. Run the application:
