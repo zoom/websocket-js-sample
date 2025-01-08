@@ -3,10 +3,6 @@
 
 This repository demonstrates how to integrate with Zoom's WebSocket API, including OAuth token fetching and WebSocket connection management. It includes a heartbeat mechanism to keep WebSocket connections alive and provides a reference implementation for interacting with Zoom's WebSocket-based services.
 
-## Repository
-
-- **Repo URL**: [https://github.com/eziosudo/websocket_demo](https://github.com/eziosudo/websocket_demo)
-
 ## Features
 
 - Fetches Zoom OAuth access tokens using the client credentials grant type.
@@ -18,16 +14,16 @@ This repository demonstrates how to integrate with Zoom's WebSocket API, includi
 
 Before running the project, ensure you have the following:
 
-1. **Node.js**: Version 18.0.0 or higher (or use `node-fetch` for lower versions).
-2. **Zoom Account**: Create an server-to-server OAuth or general app on the [Zoom Marketplace](https://marketplace.zoom.us/) to get your client ID and client secret.
+1. **Node.js**: Version 18.0.0 or higher for built-in fetch API support.
+2. **Zoom Account**: Create a server-to-server OAuth or general app on the [Zoom Marketplace](https://marketplace.zoom.us/) to get your client ID and client secret.
 3. **Environment Variables**: Set up a `.env` file for your credentials.
 
 ## Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/eziosudo/websocket_demo.git
-   cd websocket_demo
+   git clone https://github.com/zoom/websocket-js-sample.git
+   cd websocket-js-sample
    ```
 
 2. Install dependencies:
@@ -60,17 +56,32 @@ Before running the project, ensure you have the following:
 
 ## How It Works
 
+### Environment Variables Validation
+
+The application validates required environment variables on startup:
+```javascript
+const requiredEnvVars = ['SUBSCRIPTION_ID', 'WS_URL', 'CLIENT_USERNAME', 'CLIENT_PASSWORD', 'OAUTH_URL'];
+requiredEnvVars.forEach((envVar) => {
+    if (!process.env[envVar]) {
+        throw new Error(`Environment variable ${envVar} is required but not defined.`);
+    }
+});
+```
+
 ### Access Token Fetching
 
 Access tokens are fetched from Zoom's API using the client credentials grant type:
 
 ```javascript
-const url = `https://zoom.us/oauth/token?grant_type=client_credentials`;
+const url = `${process.env.OAUTH_URL}?grant_type=client_credentials`;
 const headers = {
     "Authorization": `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`,
     "Content-Type": "application/x-www-form-urlencoded"
 };
-const response = await fetch(url, { method: "POST", headers });
+const response = await fetch(url, {
+    method: "POST",
+    headers: headers,
+});
 ```
 
 ### WebSocket Heartbeat
@@ -90,6 +101,20 @@ function startHeartbeat() {
     }, heartbeatIntervalMs);
 }
 ```
+
+### WebSocket Connection
+
+The WebSocket URL is constructed using the subscription ID and access token:
+```javascript
+const subscriptionId = process.env.SUBSCRIPTION_ID;
+const primaryWsUrl = `${process.env.WS_URL}?subscriptionId=${subscriptionId}`;
+socket = new WebSocket(`${primaryWsUrl}&access_token=${token}`);
+```
+
+The application implements a retry mechanism for WebSocket connections:
+- Maximum 5 retry attempts
+- 3-second delay between retries
+- Fresh access token for each attempt
 
 ### WebSocket Event Handling
 
@@ -112,6 +137,11 @@ node connect_websocket.js
 
 - Ensure your Zoom server-to-server OAuth or general app is properly configured in the Zoom Marketplace.
 - For production use, consider implementing a token refresh mechanism and secure credential storage.
+- The following environment variables are fixed Zoom endpoints and can be used directly:
+  ```
+  OAUTH_URL=https://zoom.us/oauth/token    # Zoom OAuth token endpoint
+  WS_URL=wss://ws.zoom.us/ws              # Zoom WebSocket endpoint
+  ```
 
 ## Resources
 
