@@ -1,12 +1,8 @@
 require('dotenv').config();
-// require('dotenv').config({ path: '.envDev' });
 const WebSocket = require('ws');
 
-let accessToken = null;
-let heartbeatInterval = null;
-
 // Check if required environment variables are defined
-const requiredEnvVars = ['SUBSCRIPTION_ID', 'WS_URL', 'CLIENT_USERNAME', 'CLIENT_PASSWORD', 'OAUTH_URL'];
+const requiredEnvVars = ['CLIENT_USERNAME', 'CLIENT_PASSWORD', 'SUBSCRIPTION_ID', 'WS_URL', 'OAUTH_URL'];
 requiredEnvVars.forEach((envVar) => {
     if (!process.env[envVar]) {
         throw new Error(`Environment variable ${envVar} is required but not defined.`);
@@ -17,11 +13,13 @@ requiredEnvVars.forEach((envVar) => {
 async function getAccessToken() {
     const username = process.env.CLIENT_USERNAME;
     const password = process.env.CLIENT_PASSWORD;
-    const url = `${process.env.OAUTH_URL}?grant_type=client_credentials`; // OAuth token URL
+    // OAuth token URL
+    const url = `${process.env.OAUTH_URL}?grant_type=client_credentials`;
 
     const headers = {
-        "Authorization": `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`, // Base64 encoded credentials
-        "Content-Type": "application/x-www-form-urlencoded" // Content type for POST request
+        // Base64 encoded credentials
+        "Authorization": `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`,
+        "Content-Type": "application/x-www-form-urlencoded"
     };
 
     try {
@@ -35,10 +33,8 @@ async function getAccessToken() {
         if (!response.ok) {
             throw new Error(`Failed to fetch access token: ${JSON.stringify(data)}`);
         }
-
-        accessToken = data.access_token; // Store the access token
         console.log(`Successfully fetched a new access token.`);
-        return accessToken;
+        return data.access_token;
     } catch (error) {
         console.error("Error fetching access token:", error);
         throw error;
@@ -57,7 +53,6 @@ async function createWebSocket(currentWsUrl) {
             const token = await getAccessToken();
             console.log(`Attempting to connect to WebSocket: ${currentWsUrl}`);
             socket = new WebSocket(`${currentWsUrl}&access_token=${token}`);
-
             // Add event listeners for WebSocket
             addWebSocketListeners(socket);
              // Return the WebSocket instance if successful
@@ -65,7 +60,8 @@ async function createWebSocket(currentWsUrl) {
         } catch (error) {
             console.error(`WebSocket connection failed. Retry ${retries + 1}/${maxRetries}`);
             retries++;
-            await new Promise((resolve) => setTimeout(resolve, 3000)); // Wait 3 seconds before retrying
+            // Wait 3 seconds before retrying
+            await new Promise((resolve) => setTimeout(resolve, 3000));
         }
     }
 
@@ -97,7 +93,8 @@ function addWebSocketListeners(socket) {
 // Start the heartbeat mechanism
 function startHeartbeat(socket) {
     const heartbeatMessage = JSON.stringify({ "module":"heartbeat" });
-    const heartbeatIntervalMs = 30000; // Heartbeat every 30 seconds
+    // Heartbeat every 30 seconds
+    const heartbeatIntervalMs = 30000;
 
     heartbeatInterval = setInterval(() => {
         if (socket.readyState === WebSocket.OPEN) {
