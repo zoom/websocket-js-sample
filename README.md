@@ -17,6 +17,7 @@ Before running the project, ensure you have the following:
 1. **Node.js**: Version 18.0.0 or higher for built-in fetch API support.
 2. **Zoom Account**: Create a server-to-server OAuth or general app on the [Zoom Marketplace](https://marketplace.zoom.us/) to get your client ID and client secret.
 3. **Environment Variables**: Set up a `.env` file for your credentials.
+    > :warning: **Do not store credentials in plain text on production environments**
 
 ## Installation
 
